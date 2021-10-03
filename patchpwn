@@ -1,0 +1,140 @@
+#!/bin/bash
+
+#=================================================
+# Author : Cat03
+# Email  : Giles_Anderson@outlook.com 
+# Blog   : https://giles-one.github.io/
+# Github : https://github.com/Giles-one/
+#=================================================
+
+
+# =================here=to=change==================
+# LIBC_DIR="/home/giles/tools/glibc-all-in-one/"
+LIBC_DIR="/dir/to/your/glibc-all-in-one/"
+# =================here=to=change==================
+SUFFIX="_patched"
+
+SUB_DIR="libs"
+SOURCE=$LIBC_DIR$SUB_DIR
+
+# the default is x86 glibc
+DEFAULT_ubuntu16_04="2.23-0ubuntu11.3_amd64"
+DEFAULT_ubuntu18_04="2.27-3ubuntu1.4_amd64"
+DEFAULT_ubuntu20_04="2.31-0ubuntu9.2_amd64" 
+
+DEFAULT_ubuntu16_32="2.23-0ubuntu11.3_i386"
+DEFAULT_ubuntu18_32="2.27-3ubuntu1.4_i386"
+DEFAULT_ubuntu20_32="2.31-0ubuntu9.2_i386"
+
+die(){
+	echo 1>&2 $1
+	exit 1
+}
+
+printLibc()
+{
+	for one in $(ls $SOURCE)
+	do
+		printf "[+] $one\n"
+	done
+}
+
+topatchelf()
+{
+	NEWFILE=$3$SUFFIX
+	cp $3 $NEWFILE
+	patchelf --set-interpreter $2 $NEWFILE
+	patchelf --replace-needed libc.so.6 $1 $NEWFILE
+}
+
+useage()
+{
+	cat <<-'EOF'
+	To say:
+	[*] This shell script should be used with patchelf and glibc-all-in-one.
+	[*] If you haven't installed them yet,I recommand visiting https://github.com/NixOS/patchelf and https://github.com/matrix1001/glibc-all-in-one
+	[*] You can select a glibc version or a ubuntu system (ubuntu16,ubuntu18,ubuntu20 are supported)
+
+	Usage: 
+	[*] You should edit the LIBC_DIR variable to adapt your local environment firstly.
+	[*] patchpwn libc ./elf
+
+	Example:
+	[*] patchpwn 2.27-3ubuntu1_amd64 ./pwn
+	[*] patchpwn ubuntu20.04 ./pwn
+	[*] patchpwn ubuntu20.04 ./pwn 32 # to patch i386 libc
+
+	EOF
+	if [[ ! -d "$LIBC_DIR" ]] || [[ ! -d $SOURCE ]]
+	then
+		die "The $LIBC_DIR doesn't not exist or you have not download any libc"
+	else
+		printf "Your Libc:\n"
+		printLibc
+	fi
+	exit 1
+}
+
+
+if [[ $# -eq 0 ]] || [[ $1 = "-h" ]] || [[ $1 = "--help" ]] 
+then
+	useage
+fi
+
+if [[ $# -lt 2 ]]
+then
+	die "[-] missing argument "
+fi
+
+cd "$( dirname "$2" )"
+
+
+if [ "$3" = "32" ]
+then
+		case $1 in
+		"ubuntu20")
+			LIBC_VERSION=$DEFAULT_ubuntu20_32
+			;;
+		"ubuntu18")
+			LIBC_VERSION=$DEFAULT_ubuntu18_32
+			;;
+		"ubuntu16")
+			LIBC_VERSION=$DEFAULT_ubuntu16_32
+			;;
+		*)
+			LIBC_VERSION=$1
+			;;
+	esac
+else
+	case $1 in
+		"ubuntu20")
+			LIBC_VERSION=$DEFAULT_ubuntu20_04
+			;;
+		"ubuntu18")
+			LIBC_VERSION=$DEFAULT_ubuntu18_04
+			;;
+		"ubuntu16")
+			LIBC_VERSION=$DEFAULT_ubuntu16_04
+			;;
+		*)
+			LIBC_VERSION=$1
+			;;
+	esac
+fi
+
+FINAL_DIR="$SOURCE/$LIBC_VERSION"
+
+if [[ ! -d $FINAL_DIR ]] || [[ ! -e $2 ]] 
+then
+	die "[-] libc or binary do not exist "
+fi
+
+if [ "$3" = "32" ]
+then
+	LIBC="$FINAL_DIR/libc.so.6"
+	LD="$FINAL_DIR/ld-linux.so.2"
+else
+	LIBC="$FINAL_DIR/libc.so.6"
+	LD="$FINAL_DIR/ld-linux-x86-64.so.2"
+fi
+topatchelf $LIBC $LD $2
